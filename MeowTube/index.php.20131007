@@ -1,0 +1,120 @@
+<?php
+require_once "HTTP/Request.php";
+require_once dirname(__FILE__) . "/Common/DBConnection.php";
+require_once dirname(__FILE__) . "/Common/Logger.php";
+require_once dirname(__FILE__) . "/Common/Pager.php";
+
+define("VIDEOS_PER_PAGE", 10);
+
+    $db = DBConnection::get()->handle();
+
+	// 動画のデータ取得
+    $blog_post_lr = array("blog_post left", "blog_post right");
+
+	if( isset($_GET['page']) and preg_match('/^[1-9][0-9]*$/', $_GET['page']) )
+	{
+		$page = (int)$_GET['page'];
+	}
+	else
+	{
+		$page = 1;
+	}
+	$offset = VIDEOS_PER_PAGE * ($page - 1);
+    $sql = 'SELECT * FROM youtube ORDER BY getdate DESC LIMIT :limit , :videos_per_page';
+    try
+    {
+        $stmt = $db->prepare( $sql );
+		$stmt->bindValue(':limit', $offset, PDO::PARAM_INT);
+		$stmt->bindValue(':videos_per_page', VIDEOS_PER_PAGE, PDO::PARAM_INT);
+        $stmt->execute();
+		$result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+	}
+    catch( PDOException $e )
+    {
+    	echo 'エラーが発生しました。管理者にご連絡ください';
+    	Logger::error($e->getMessage());
+    }
+
+	// ページングのリンクデータ取得
+	try
+	{
+		$link_stmt = $db->query('SELECT COUNT(*) AS count FROM youtube');
+		$link_result = $link_stmt->fetch();
+		$totalPages = ceil($link_result['count'] / VIDEOS_PER_PAGE);
+		$page_navi = new Pager('page', VIDEOS_PER_PAGE, $link_result['count']);
+	}
+	catch( PDOException $e )
+	{
+    	echo 'エラーが発生しました。管理者にご連絡ください';
+    	Logger::error($e->getMessage());
+	}
+?>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="description" content="MeowTube">
+  <meta name="keywords" content="cat">
+  <meta name="author" content="MeowTube">
+  <meta name="copyright" content="Copyright &copy; MeowTube">
+  <title>MeowTube</title>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7/jquery.min.js"></script>
+  <script type="text/javascript" src="js/pagetop.js"></script>
+  <script type="text/javascript" src="js/tipsy.js"></script>
+  <script type="text/javascript" src="js/slider.min.js"></script>
+  <script type="text/javascript" src="js/pull.out.js"></script>
+  <link rel="stylesheet" type="text/css" href="css/styles.css"/>
+  <link rel="sshortcut icon" href="favicon.ico">
+</head>
+<body id="back">
+
+
+<header>
+	<?php include './header.php';?>
+</header>
+
+
+<section class="keyvisual">
+  <div id="slider">
+    <img class="image" src="img/key/visual01.jpg" alt="イメージ" />
+    <img class="image" src="img/key/visual02.jpg" alt="イメージ" />
+    <img class="image" src="img/key/visual03.jpg" alt="イメージ" />
+    <img class="image" src="img/key/visual04.jpg" alt="イメージ" />
+    <img class="image" src="img/key/visual05.jpg" alt="イメージ" />
+    <img class="image" src="img/key/visual06.jpg" alt="イメージ" />
+  </div>
+  <hgroup>
+    <h1><img src="img/common/logo.png" width="80" alt="sample logo" /></h1>
+    <h2>今日も１日１猫動画。このサイトは毎日猫に関する動画を紹介します。</h2>
+  </hgroup>
+</section>
+
+
+<section class="social">
+	<?php include 'SocialButton.php';?>
+</section>
+
+
+<div class="wrapper">
+	<?php for( $i=0; $i<count($result); $i++) :?>
+	<section class="<?=$blog_post_lr[$i%2];?>">
+		<time datetime="<?=$result[$i]['getdate'];?>"><?=date('Y年m月d日', strtotime($result[$i]['getdate']));?></time>
+		<a href="./TodaysCat.php?id=<?=$result[$i]['id'];?>"><img src="<?=$result[$i]['thumbnail'];?>" alt="thumbnail" /></a>
+		<h2><a href="./TodaysCat.php?id=<?=$result[$i]['id'];?>"><?=$result[$i]['title'];?></a></h2>
+		<p><?=mb_strimwidth($result[$i]['description'], 0, 150, "…", "UTF-8");?></p>
+		<a href="./TodaysCat.php?id=<?=$result[$i]['id'];?>" class="text_btn">View Video</a>
+	</section>
+	<?php endfor; ?>
+</div>
+
+<div class="pagenavi">
+	<?=$page_navi->getPager();?>
+</div>
+
+
+<footer>
+	<?php include './footer.php';?>
+</footer>
+
+</body>
+</html>
